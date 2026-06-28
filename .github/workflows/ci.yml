@@ -1,0 +1,44 @@
+# ============================================
+# 后端 CI（Express + Prisma + SQLite）
+# ============================================
+# 触发时机：push 到 main 分支、或提 Pull Request 到 main 分支
+# 做的事情：装依赖 → 生成 Prisma 类型 → TypeScript 类型检查
+# 结果：    GitHub 上看到绿色 ✅ 或红色 ❌
+
+name: 后端 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest    # GitHub 提供的一台临时 Linux 虚拟机
+
+    steps:
+      # 第 1 步：把代码拉到这台虚拟机上
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      # 第 2 步：装 Node.js（22.x 跟你本地一致）
+      - name: 装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm           # 缓存 npm 下载的包，下次更快
+
+      # 第 3 步：装依赖（npm ci 比 npm install 更快更严格）
+      - name: 装依赖
+        run: npm ci
+
+      # 第 4 步：生成 Prisma 客户端的类型文件
+      #         不跑这一步的话，tsc 会报"找不到 PrismaClient"
+      - name: 生成 Prisma 类型
+        run: npx prisma generate
+
+      # 第 5 步：TypeScript 类型检查
+      #         有错就失败，PR 上显示红色 ❌
+      - name: 类型检查
+        run: npx tsc --noEmit
