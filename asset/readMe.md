@@ -54,3 +54,6 @@ npx prisma studio
 }
 
 规则：任何代码不能使用对应包低大版本废弃、移除的API。
+
+
+my-express-prisma-api-production.up.railway.app

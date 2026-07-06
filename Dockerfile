@@ -18,5 +18,5 @@ RUN npx prisma generate
 # 声明端口
 EXPOSE 3000
 
-# 启动
-CMD ["npm", "start"]
+# 先迁移再启动
+CMD sh -c "npx prisma migrate deploy && npm start"
