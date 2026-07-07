@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import todoRoutes from './routes/todo.js';
+import cors from 'cors';
+
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -30,5 +32,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
+app.use(cors({
+  origin: 'https://my-ai-app-khaki.vercel.app'
+}));
 
 export default app;
