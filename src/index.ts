@@ -7,8 +7,14 @@ import cors from 'cors';
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
+
+
 // ── 中间件 ──
 app.use(express.json());
+
+app.use(cors({
+  origin: 'https://my-ai-app-khaki.vercel.app'
+}));
 
 // ── 路由 ──
 app.use('/api/todos', todoRoutes);
@@ -33,8 +39,6 @@ app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
 
-app.use(cors({
-  origin: 'https://my-ai-app-khaki.vercel.app'
-}));
+
 
 export default app;
