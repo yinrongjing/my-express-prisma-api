@@ -1,0 +1,49 @@
+# ============================================
+# 部署前检查：禁止硬编码 dev.db 路径
+# ============================================
+# 每次 push 或提 PR 时自动跑
+# 扫描 .ts 文件中是否写了死路径，有的话直接报红，不准部署
+
+name: 部署前检查
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-hardcoded:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 扫描硬编码的 dev.db 路径
+        run: |
+          echo "正在扫描所有 .ts 文件中是否写了死路径 'dev.db'..."
+
+          # 在 .ts 文件中搜索（排除 node_modules 和 generated）
+          RESULTS=$(grep -rn "'\./dev\.db'" src/ prisma/ --include='*.ts' 2>/dev/null || true)
+          RESULTS="$RESULTS"$'\n'"$(grep -rn '"/dev\.db"' src/ prisma/ --include='*.ts' 2>/dev/null || true)"
+          RESULTS="$RESULTS"$'\n'"$(grep -rn '"file:\./dev\.db"' src/ prisma/ --include='*.ts' 2>/dev/null || true)"
+
+          # 过滤掉空行
+          RESULTS=$(echo "$RESULTS" | grep -v '^$' || true)
+
+          if [ -n "$RESULTS" ]; then
+            echo ""
+            echo "========================================"
+            echo " ❌ 发现硬编码的 dev.db 路径："
+            echo "========================================"
+            echo "$RESULTS"
+            echo "========================================"
+            echo ""
+            echo " 这些地方需要改成 process.env.DATABASE_URL"
+            echo " 详见 DEVELOPMENT_LOG.md 里的部署说明"
+            echo "========================================"
+            exit 1
+          else
+            echo " ✅ 未发现硬编码路径，检查通过"
+          fi
