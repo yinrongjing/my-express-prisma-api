@@ -4,34 +4,49 @@
 # 每次 push 或提 PR 时自动跑
 # 扫描 .ts 文件中是否写了死路径，有的话直接报红，不准部署
 
-name: 部署前检查
+name: 部署前检查  # GitHub Actions 页面上显示的名字
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+on:                   # 什么时候触发
+  push:               #   push 代码时
+    branches: [main]  #   仅 main 分支
+  pull_request:       #   提 Pull Request 时
+    branches: [main]  #   目标为 main 分支
 
-jobs:
-  check-hardcoded:
-    runs-on: ubuntu-latest
+jobs:                         # 要执行的任务列表
+  check-hardcoded:            #   任务名（随便起）
+    runs-on: ubuntu-latest    #   在 GitHub 提供的最新 Ubuntu 虚拟机上跑
 
-    steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
+    steps:                                            # 任务步骤
+      - name: 拉取代码                                 #   步骤1：显示名称
+        uses: actions/checkout@v4                     #   用 GitHub 官方 action 把代码拉到虚拟机上
 
-      - name: 扫描硬编码的 dev.db 路径
-        run: |
+      - name: 扫描硬编码的 dev.db 路径                   #   步骤2：显示名称
+        run: |                                        #   直接在虚拟机终端里执行以下 shell 脚本
           echo "正在扫描所有 .ts 文件中是否写了死路径 'dev.db'..."
 
-          # 在 .ts 文件中搜索（排除 node_modules 和 generated）
-          RESULTS=$(grep -rn "'\./dev\.db'" src/ prisma/ --include='*.ts' 2>/dev/null || true)
-          RESULTS="$RESULTS"$'\n'"$(grep -rn '"/dev\.db"' src/ prisma/ --include='*.ts' 2>/dev/null || true)"
-          RESULTS="$RESULTS"$'\n'"$(grep -rn '"file:\./dev\.db"' src/ prisma/ --include='*.ts' 2>/dev/null || true)"
+          # ==============================================
+          # 搜所有包含 dev.db 的行，再用 grep -v 排除已经用了 process.env 的
+          # （比如 process.env.DATABASE_URL || './dev.db' 是正确的兜底，不用改）
+          # ==============================================
+          # 第 1 步：grep 搜出所有包含 dev.db 的 .ts 文件行
+          # ==============================================
+          RESULTS=$(grep -rn "dev\.db" src/ prisma/ --include='*.ts' 2>/dev/null || true)
 
+          # ==============================================
+          # 第 2 步：通过管道 | 传给第二个 grep
+          # grep -v "process.env" = 排除已经用了环境变量的行
+          # 管道不需要写文件路径，它直接从上一个 grep 的输出里读
+          # ==============================================
+          RESULTS=$(echo "$RESULTS" | grep -v "process.env" || true)
+
+          # ==============================================
           # 过滤掉空行
+          # ==============================================
           RESULTS=$(echo "$RESULTS" | grep -v '^$' || true)
 
+          # ==============================================
+          # 如果 RESULTS 不为空（-n），说明有漏网之鱼
+          # ==============================================
           if [ -n "$RESULTS" ]; then
             echo ""
             echo "========================================"
@@ -43,7 +58,7 @@ jobs:
             echo " 这些地方需要改成 process.env.DATABASE_URL"
             echo " 详见 DEVELOPMENT_LOG.md 里的部署说明"
             echo "========================================"
-            exit 1
+            exit 1          # 退出码 1 = 失败，GitHub Actions 上显示红色 ❌
           else
             echo " ✅ 未发现硬编码路径，检查通过"
-          fi
+          fi             # if 语句结束
