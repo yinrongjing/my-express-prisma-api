@@ -41,19 +41,76 @@ function parseId(req: Request): number | null {
   return isNaN(id) ? null : id;
 }
 
-// ── GET /api/todos ── 获取所有 Todo
+// ── GET /api/todos ── 分页获取 Todo（?page=1&pageSize=10）
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const todos = await prisma.todo.findMany({
-      orderBy: { createdAt: 'desc' },
+    const page = Math.max(1, parseInt(String(req.query.page)) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize)) || 10));
+    const skip = (page - 1) * pageSize;
+    const keyword = String(req.query.keyword ?? '');
+    const status = String(req.query.status ?? '');
+
+    // 构建搜索条件
+    const where: Record<string, unknown> = {};
+    if (keyword) where.taskName = { contains: keyword };
+    if (status) where.completed = status;
+
+    const [todos, total] = await Promise.all([
+      prisma.todo.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { id: 'asc' },
+      }),
+      prisma.todo.count({ where }),
+    ]);
+
+    res.json({
+      list: todos,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
     });
-    res.json(todos);
   } catch (err) {
     console.error('GET /todos error:', err);
     res.status(500).json({ error: '获取任务列表失败' });
   }
 });
+
+// ── POST /api/todos/seed ── 写入 50 条测试数据
+// 注意：这个路由必须在 /:id 前面，否则 /seed 会被 :id 匹配
+
+router.post('/seed', async (_req: Request, res: Response) => {
+  try {
+    const tasks: { taskName: string; desp: string; completed: string }[] = [];
+    const statuses = ['pending', 'running', 'done'];
+    const prefixes = [
+      '前端页面优化', '后端接口开发', '数据库设计', '用户反馈处理',
+      '性能监控', '安全审计', '文档编写', '单元测试', '集成测试',
+      '部署上线',
+    ];
+    const suffixes = ['第一期', '第二期', '优化版', '紧急修复', '日常维护'];
+
+    for (let i = 0; i < 50; i++) {
+      const prefix = prefixes[i % prefixes.length]!;
+      const suffix = suffixes[Math.floor(i / prefixes.length) % suffixes.length]!;
+      tasks.push({
+        taskName: `${prefix}-${suffix}-${i + 1}`,
+        desp: `这是第 ${i + 1} 条测试任务的描述，随机状态：${statuses[i % 3]}`,
+        completed: statuses[i % 3]!,
+      });
+    }
+
+    await prisma.todo.createMany({ data: tasks });
+    res.status(201).json({ message: `成功写入 ${tasks.length} 条数据`, count: tasks.length });
+  } catch (err) {
+    console.error('POST /todos/seed error:', err);
+    res.status(500).json({ error: '写入测试数据失败' });
+  }
+});
+
 // ── GET /api/todos/:id ── 获取单个 Todo
 
 router.get('/:id', async (req: Request, res: Response) => {
